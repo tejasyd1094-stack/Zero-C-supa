@@ -1,8 +1,9 @@
 export default function FooterBranding() {
   return (
-    <footer className='footer'>
-      <div>Built by <strong>KryptonPath.com</strong></div>
-      <div>Queries: <strong>business@kryptonpath.com</strong></div>
+    <footer className="text-center p-6 text-gray-400 text-sm">
+      © {new Date().getFullYear()} Kryptonpath.com  
+      <br />
+      For business queries: business@kryptonpath.com
     </footer>
   );
 }
