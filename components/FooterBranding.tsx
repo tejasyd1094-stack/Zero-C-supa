@@ -1,9 +1,7 @@
 export default function FooterBranding() {
   return (
-    <footer className="text-center p-6 text-gray-400 text-sm">
-      © {new Date().getFullYear()} Kryptonpath.com  
-      <br />
-      For business queries: business@kryptonpath.com
+    <footer style={{ padding: "16px", borderTop: "1px solid #ddd" }}>
+      <p>© 2025 Zero Conflict. All rights reserved.</p>
     </footer>
   );
 }
