@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import GradientButton from "@/components/GradientButton";
 import FeatureCard from "@/components/FeatureCard";
@@ -18,6 +20,7 @@ export default function Home() {
           AI that helps corporate professionals navigate difficult workplace
           conversations with clarity and empathy.
         </p>
+
         <GradientButton
           className="mt-8"
           onClick={() => (window.location.href = "/generator")}
@@ -30,11 +33,13 @@ export default function Home() {
         <FeatureCard title="Conflict Scripts">
           Get AI-generated messages for tough workplace situations.
         </FeatureCard>
+
         <FeatureCard title="Role-Based Tones">
-          Manager, peer, direct-report — tailored communication.
+          Manager, Peer, Direct-report — tailored communication.
         </FeatureCard>
+
         <FeatureCard title="One-Click Delivery">
-          Export messages instantly for email, Teams, or WhatsApp.
+          Export messages instantly as Email, Teams, or WhatsApp text.
         </FeatureCard>
       </section>
     </div>
