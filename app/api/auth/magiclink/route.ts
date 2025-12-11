@@ -9,18 +9,23 @@ export async function POST(req: Request) {
     const { email, redirectTo } = await req.json();
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
+    // Ensure redirectTo is absolute and falls back to NEXT_PUBLIC_APP_URL
+    const redirect = redirectTo || process.env.NEXT_PUBLIC_APP_URL || "";
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: redirectTo || process.env.NEXT_PUBLIC_APP_URL
+        emailRedirectTo: redirect
       }
     });
 
-    if (error)
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
+    // NOTE: To change the email subject from "Supabase Auth" to "Zero Conflict AI":
+    // Go to Supabase Console -> Authentication -> Templates -> Override email templates.
+    // Edit the Magic Link template subject to "Zero Conflict AI" and save. This is the recommended approach.
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "Bad request" }, { status: 400 });
+  } catch (err:any) {
+    return NextResponse.json({ error: err?.message || "Bad request" }, { status: 400 });
   }
 }
