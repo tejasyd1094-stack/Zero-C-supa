@@ -1,55 +1,42 @@
 import Image from "next/image";
+import GradientButton from "@/components/GradientButton";
+import FeatureCard from "@/components/FeatureCard";
 
 export default function Home() {
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen p-8">
-
-      {/* Header Section */}
-      <header className="mb-10 text-center">
+    <div className="py-16">
+      <section className="text-center">
         <Image
           src="/logo.png"
-          alt="Zero Conflict Logo"
-          width={120}
-          height={120}
-          className="mx-auto"
+          alt="logo"
+          width={160}
+          height={160}
+          className="mx-auto rounded-2xl shadow-lg"
         />
-
-        <h1 className="text-4xl font-bold mt-5">Zero-Conflict</h1>
-        <p className="text-lg text-gray-600 mt-2">
-          AI that helps corporate professionals navigate difficult conversations.
+        <h1 className="mt-8 text-4xl font-bold">Zero Conflict</h1>
+        <p className="mt-3 text-white/70 max-w-2xl mx-auto">
+          AI that helps corporate professionals navigate difficult workplace
+          conversations with clarity and empathy.
         </p>
-      </header>
-
-      {/* Feature Cards */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
-
-        <div className="border rounded-xl p-6 shadow-sm">
-          <h2 className="text-xl font-semibold">Conflict Scripts</h2>
-          <p className="mt-2 text-gray-600">
-            Get AI-generated messages for tough workplace situations.
-          </p>
-        </div>
-
-        <div className="border rounded-xl p-6 shadow-sm">
-          <h2 className="text-xl font-semibold">Role-Based Tones</h2>
-          <p className="mt-2 text-gray-600">
-            Manager, peer, direct-report — tailored communication.
-          </p>
-        </div>
-
-        <div className="border rounded-xl p-6 shadow-sm">
-          <h2 className="text-xl font-semibold">One Click Delivery</h2>
-          <p className="mt-2 text-gray-600">
-            Export messages instantly for email, Teams, or WhatsApp.
-          </p>
-        </div>
-
+        <GradientButton
+          className="mt-8"
+          onClick={() => (window.location.href = "/generator")}
+        >
+          Start Generating Scripts
+        </GradientButton>
       </section>
 
-      {/* Footer */}
-      <footer className="mt-14 text-sm text-gray-500">
-        © {new Date().getFullYear()} Zero-Conflict — Empowering workplace clarity.
-      </footer>
-    </main>
+      <section className="mt-16 grid md:grid-cols-3 gap-6">
+        <FeatureCard title="Conflict Scripts">
+          Get AI-generated messages for tough workplace situations.
+        </FeatureCard>
+        <FeatureCard title="Role-Based Tones">
+          Manager, peer, direct-report — tailored communication.
+        </FeatureCard>
+        <FeatureCard title="One-Click Delivery">
+          Export messages instantly for email, Teams, or WhatsApp.
+        </FeatureCard>
+      </section>
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 export default function FooterBranding() {
   return (
-    <footer style={{ padding: "16px", borderTop: "1px solid #ddd" }}>
-      <p>© 2025 Zero Conflict. All rights reserved.</p>
+    <footer className="mt-12 py-6 text-center text-white/60 text-sm">
+      Built by <strong>Kryptonpath.com</strong> — business@kryptonpath.com
     </footer>
   );
 }

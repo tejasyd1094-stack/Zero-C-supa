@@ -3,17 +3,21 @@ import { Providers } from "./providers";
 import Navbar from "@/components/Navbar";
 import FooterBranding from "@/components/FooterBranding";
 
-export const metadata = { title: "Zero Conflict — KryptonPath", description: "AI conflict scripts." };
+export const metadata = {
+  title: "Zero Conflict",
+  description: "AI Dialogue Engine for difficult workplace conversations"
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body>
-        <Providers>
+        <Providers />
+        <div className="max-w-5xl mx-auto px-4">
           <Navbar />
-          <main className="container">{children}</main>
+          <main>{children}</main>
           <FooterBranding />
-        </Providers>
+        </div>
       </body>
     </html>
   );
