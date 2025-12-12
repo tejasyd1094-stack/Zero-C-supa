@@ -1,26 +1,34 @@
 import "./globals.css";
-import { Providers } from "./providers";
+import type { Metadata } from "next";
+import Providers from "./providers";
 import Navbar from "@/components/Navbar";
-import FooterBranding from "@/components/FooterBranding";
 
-export const metadata = {
-  title: "Zero Conflict",
-  description: "AI Dialogue Engine for difficult workplace conversations"
+export const metadata: Metadata = {
+  title: "Zero Conflict AI",
+  description:
+    "AI-powered scripts to handle difficult conversations — at work, in relationships, and in life.",
 };
 
 export default function RootLayout({
-  children
+  children,
 }: {
   children: React.ReactNode;
 }) {
   return (
     <html lang="en">
-      <body>
+      <head>
+        {/* Razorpay Checkout Script */}
+        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+      </head>
+
+      <body className="bg-[#070d1f] text-white">
         <Providers>
-          <div className="max-w-5xl mx-auto px-4">
+          <div className="min-h-screen flex flex-col">
             <Navbar />
-            <main>{children}</main>
-            <FooterBranding />
+
+            <main className="flex-1">
+              {children}
+            </main>
           </div>
         </Providers>
       </body>
