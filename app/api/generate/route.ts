@@ -1,75 +1,101 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { createClient } from "@supabase/supabase-js";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(req: Request) {
-  const supabase = supabaseServer();
-  const body = await req.json();
+  try {
+    const body = await req.json();
+    const {
+      userId,
+      situation,
+      role,
+      mode,
+      behaviour,
+    } = body;
 
-  const { requestId, situation, role, mode, behaviour } = body;
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1️⃣ Check credits
+    const { data: usage } = await supabase
+      .from("usage_limits")
+      .select("credits")
+      .eq("user_id", userId)
+      .single();
 
-  const userId = auth.user.id;
+    if (!usage || usage.credits <= 0) {
+      return NextResponse.json(
+        { error: "No credits left" },
+        { status: 403 }
+      );
+    }
 
-  // prevent double charge
-  const { data: exists } = await supabase
-    .from("generated_scripts")
-    .select("id")
-    .eq("request_id", requestId)
-    .maybeSingle();
+    // 2️⃣ Prompt (first-person, Hinglish friendly)
+    const prompt = `
+You are Zero Conflict AI.
 
-  if (exists) {
-    return NextResponse.json({ error: "Already processed" });
-  }
+Generate 3 FIRST-PERSON conversation scripts (I / me / my).
+Do NOT speak in third person.
 
-  const { data: usage } = await supabase
-    .from("usage_limits")
-    .select("credits")
-    .eq("user_id", userId)
-    .single();
+Tone must feel natural for Indians (Hinglish allowed).
 
-  if (!usage || usage.credits <= 0)
-    return NextResponse.json({ error: "No credits left" }, { status: 403 });
+Context:
+- Situation: ${situation}
+- Role of other person: ${role}
+- Mode of communication: ${mode}
+- Behaviour of other person: ${behaviour}
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+Return JSON strictly in this format:
 
-  const prompt = `
-Return ONLY JSON.
-Three scripts in Hinglish:
-1. Empathetic
-2. Bold (first-person, assertive, direct, NOT third person)
-3. Clever
-
-Situation: ${situation}
-Role: ${role}
-Mode: ${mode}
-Behaviour: ${behaviour}
+{
+  "scripts": [
+    { "type": "Empathetic", "text": "..." },
+    { "type": "Bold", "text": "..." },
+    { "type": "Clever", "text": "..." }
+  ]
+}
 `;
 
-  const res = await openai.responses.create({
-    model: "gpt-4o-mini",
-    input: prompt,
-    max_output_tokens: 600,
-  });
+    // 3️⃣ OpenAI call (CORRECT METHOD)
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 600,
+    });
 
-  const parsed = JSON.parse(res.output_text!);
+    const rawText = completion.choices[0]?.message?.content || "{}";
+    const parsed = JSON.parse(rawText);
 
-  for (const s of parsed.scripts) {
+    // 4️⃣ Save script history
     await supabase.from("generated_scripts").insert({
       user_id: userId,
-      type: s.type === "Bold / Direct" ? "Bold" : s.type,
-      text: s.text,
-      request_id: requestId,
-      credits_used: 1,
+      request_id: crypto.randomUUID(),
+      payload: parsed,
     });
+
+    // 5️⃣ Deduct credit
+    await supabase
+      .from("usage_limits")
+      .update({ credits: usage.credits - 1 })
+      .eq("user_id", userId);
+
+    return NextResponse.json(parsed);
+  } catch (error: any) {
+    console.error("Generate API error:", error);
+    return NextResponse.json(
+      { error: "Failed to generate script" },
+      { status: 500 }
+    );
   }
-
-  await supabase
-    .from("usage_limits")
-    .update({ credits: usage.credits - 1 })
-    .eq("user_id", userId);
-
-  return NextResponse.json({ scripts: parsed.scripts });
 }
