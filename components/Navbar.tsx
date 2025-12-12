@@ -9,7 +9,7 @@ export default function Navbar() {
 
   return (
     <nav className="flex items-center justify-between py-4">
-      {/* LEFT SECTION */}
+      {/* LEFT — LOGO ONLY WHEN LOGGED IN */}
       <Link href="/" className="flex items-center gap-3">
         <Image
           src="/logo.png"
@@ -19,7 +19,7 @@ export default function Navbar() {
           className="rounded-md"
         />
 
-        {/* Hide text if user is logged in */}
+        {/* Hide brand text when user is logged in */}
         {!user && (
           <span className="font-bold text-lg tracking-wide text-white">
             Zero Conflict
@@ -27,44 +27,50 @@ export default function Navbar() {
         )}
       </Link>
 
-      {/* RIGHT SECTION */}
+      {/* RIGHT — MENU */}
       <div className="flex gap-4 items-center text-sm">
-        <Link
-          href="/pricing"
-          className="text-white/70 hover:text-white transition"
-        >
+
+        <Link href="/pricing" className="text-white/70 hover:text-white">
           Pricing
         </Link>
 
-        <Link
-          href="/generator"
-          className="text-white/70 hover:text-white transition"
-        >
+        <Link href="/generator" className="text-white/70 hover:text-white">
           Generate
         </Link>
 
-        {/* Auth Toggle */}
-        {user ? (
-          <div className="flex items-center gap-3">
+        {/* WHEN LOGGED OUT → Show Login + Sign Up */}
+        {!user && (
+          <>
+            <Link
+              href="/login"
+              className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition"
+            >
+              Login
+            </Link>
+
+            <Link
+              href="/signup"
+              className="px-3 py-2 rounded-lg bg-gradient-to-r from-[#21D4FD] to-[#B721FF] font-semibold text-black transition"
+            >
+              Sign Up
+            </Link>
+          </>
+        )}
+
+        {/* WHEN LOGGED IN → Show Dashboard + Logout */}
+        {user && (
+          <div className="flex items-center gap-4">
             <Link href="/dashboard" className="text-white/80">
               Dashboard
             </Link>
             <LogoutButton />
           </div>
-        ) : (
-          <Link
-            href="/login"
-            className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20"
-          >
-            Login
-          </Link>
         )}
       </div>
     </nav>
   );
 }
 
-// Logout Component
 function LogoutButton() {
   async function logout() {
     const { supabaseBrowser } = await import("@/lib/supabaseClient");
@@ -73,7 +79,7 @@ function LogoutButton() {
   }
 
   return (
-    <button className="px-3 py-2 bg-white/10 rounded-lg hover:bg-white/20">
+    <button className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm">
       Logout
     </button>
   );
