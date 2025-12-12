@@ -4,107 +4,177 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+const MODEL = "gpt-4o-mini"; // ultra-cheap + fast
+
+// Retry helper for 429 errors
+async function safeAI(client: any, payload: any) {
+  try {
+    return await client.chat.completions.create(payload);
+  } catch (err: any) {
+    if (String(err.message || "").includes("429")) {
+      await new Promise((res) => setTimeout(res, 700));
+      return await client.chat.completions.create(payload);
+    }
+    throw err;
+  }
+}
+
+// Fallback (if OpenAI fails)
+function fallback(type: string, situation: string, between: string, behaviour: string) {
+  return `(${type})\n\n${between}, regarding "${situation}" — considering their behaviour ("${behaviour}"), here is a simple message:\n\nLet's talk about this openly and find a clear next step together.`;
+}
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email = "", situation = "", between = "", mode = "", behaviour = "Neutral", hinglish = false } = body;
+    const {
+      email = "",
+      situation = "",
+      between = "",
+      mode = "",
+      behaviour = "", // NOW free-text input
+    } = body;
 
-    if (!email) {
-      // Allow anonymous generation but usage tracking requires email for trials.
-      // We'll proceed but won't update usage.
-    }
+    if (!situation.trim())
+      return NextResponse.json({ error: "Situation is required." }, { status: 400 });
 
-    // Ensure supabase client for server operations
+    // ---------------------------
+    // Supabase client
+    // ---------------------------
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Find or create user if email provided
+    // ---------------------------
+    // User + usage tracking
+    // ---------------------------
     let userId: string | null = null;
+
     if (email) {
-      const u = await supabase.from("users").select("id").eq("email", email).limit(1).maybeSingle();
-      if (u.error) throw u.error;
-      if (u.data?.id) userId = u.data.id;
+      let user = await supabase.from("users").select("id").eq("email", email).maybeSingle();
+      if (user.error) throw user.error;
+
+      if (user.data?.id) userId = user.data.id;
       else {
-        const inserted = await supabase.from("users").insert({ email }).select("id").maybeSingle();
-        if (inserted.error) throw inserted.error;
-        userId = inserted.data.id;
+        let created = await supabase
+          .from("users")
+          .insert({ email })
+          .select("id")
+          .maybeSingle();
+        if (created.error) throw created.error;
+
+        userId = created.data.id;
         await supabase.from("usage_limits").insert({ user_id: userId, used_count: 0 });
       }
     }
 
-    // check usage if user exists
+    // Check trial
     let used = 0;
-    let isPremium = false;
+    let premium = false;
+
     if (userId) {
-      const usage = await supabase.from("usage_limits").select("used_count,premium").eq("user_id", userId).limit(1).maybeSingle();
+      const usage = await supabase
+        .from("usage_limits")
+        .select("used_count, premium")
+        .eq("user_id", userId)
+        .maybeSingle();
+
       if (usage.error) throw usage.error;
+
       used = usage.data?.used_count ?? 0;
-      isPremium = usage.data?.premium ?? false;
-      if (!isPremium && used >= 3) {
-        return NextResponse.json({ error: "Trial limit reached. Purchase Premium at KryptonPath.com" }, { status: 403 });
+      premium = usage.data?.premium ?? false;
+
+      if (!premium && used >= 3) {
+        return NextResponse.json(
+          { error: "Your free 3-script trial is over. Please upgrade your plan." },
+          { status: 403 }
+        );
       }
     }
 
-    // Build three prompts for different tones
-    const baseContext = `Situation: ${situation}
-Between: ${between}
-Mode: ${mode}
-Behaviour: ${behaviour}
-Language preference: ${hinglish ? "Hinglish (mix Hindi+English), informal where useful" : "Formal English"}
-Instructions: Provide a ready-to-send ${mode} message. Keep concise (around 40-120 words). Do not blame.`;
+    // ---------------------------
+    // Build models prompts
+    // Auto-detect Hinglish based on user input
+    // ---------------------------
+    const detectLanguageHint = `
+Important rule:
+- If user input contains Hindi or Hinglish words, respond in clear Hinglish.
+- If the input is mostly English, respond in polished English.
+- Never switch languages unless user text suggests it.
+`;
 
-    const prompts = [
-      { type: "Empathetic", prompt: baseContext + "\nTone: Empathetic, understanding, de-escalating." },
-      { type: "Bold / Direct", prompt: baseContext + "\nTone: Bold, direct, clear boundaries, assertive." },
-      { type: "Clever", prompt: baseContext + "\nTone: Witty, clever, yet polite, suggest a practical next step." },
+    const base = `
+SITUATION: ${situation}
+PERSON: ${between}
+MODE OF COMMUNICATION: ${mode}
+BEHAVIOUR (user typed): ${behaviour}
+
+${detectLanguageHint}
+
+Write messages that sound natural for Indian communication style.
+Keep them short, clear, human, and ready to send.
+`;
+
+    const tones = [
+      { type: "Empathetic", tone: "warm, understanding, emotionally mature" },
+      { type: "Bold / Direct", tone: "confident, clear, boundary-setting" },
+      { type: "Clever", tone: "smart, witty, smooth but respectful" },
     ];
 
-    let scripts: { type: string; text: string }[] = [];
+    let scripts: any[] = [];
 
+    // ---------------------------
+    // OPENAI CALL
+    // ---------------------------
     if (OPENAI_KEY) {
       try {
         const OpenAI = (await import("openai")).default;
-        const client = new OpenAI({ apiKey: OPENAI_KEY });
+        const ai = new OpenAI({ apiKey: OPENAI_KEY });
 
-        // Call OpenAI for each prompt (sequential to avoid rate issues)
-        for (const p of prompts) {
-          const resp = await client.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: p.prompt }],
-            max_tokens: 400
+        for (const t of tones) {
+          const response = await safeAI(ai, {
+            model: MODEL,
+            messages: [
+              {
+                role: "user",
+                content: base + `\n\nTONE: ${t.tone}\nGenerate a message.`,
+              },
+            ],
+            max_tokens: 240,
           });
-          const text = resp.choices?.[0]?.message?.content?.trim() || "";
-          scripts.push({ type: p.type, text: text || fallbackScript(p.type, situation, between, mode, hinglish) });
+
+          const txt = response.choices?.[0]?.message?.content?.trim();
+
+          scripts.push({
+            type: t.type,
+            text: txt || fallback(t.type, situation, between, behaviour),
+          });
         }
       } catch (err) {
-        // If OpenAI fails, use fallback templates
-        scripts = prompts.map(p => ({ type: p.type, text: fallbackScript(p.type, situation, between, mode, hinglish) }));
+        scripts = tones.map((t) => ({
+          type: t.type,
+          text: fallback(t.type, situation, between, behaviour),
+        }));
       }
     } else {
-      // No key: use fallbacks
-      scripts = prompts.map(p => ({ type: p.type, text: fallbackScript(p.type, situation, between, mode, hinglish) }));
+      // No key
+      scripts = tones.map((t) => ({
+        type: t.type,
+        text: fallback(t.type, situation, between, behaviour),
+      }));
     }
 
-    // Update usage if user exists (increment)
+    // ---------------------------
+    // Update trial count
+    // ---------------------------
     if (userId) {
-      await supabase.from("usage_limits").update({ used_count: used + 1, last_used: new Date().toISOString() }).eq('user_id', userId);
+      await supabase
+        .from("usage_limits")
+        .update({ used_count: used + 1 })
+        .eq("user_id", userId);
     }
 
     return NextResponse.json({ scripts });
-  } catch (err:any) {
-    console.error(err);
-    return NextResponse.json({ error: err?.message || "Server error" }, { status: 500 });
+  } catch (err: any) {
+    console.error("Generate error:", err);
+    return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
   }
-}
-
-function fallbackScript(type: string, situation: string, between: string, mode: string, hinglish: boolean) {
-  // Simple fallback templates — include Hinglish if requested
-  const h = (s: string) => hinglish ? s + " (Hinglish tone ok)" : s;
-  if (type === "Empathetic") {
-    return h(`Hi ${between},\n\nI hope you’re doing well. I wanted to share something I’ve been feeling about ${situation}. I value our relationship and wanted to discuss this so we can find a solution together. Would you be open to a quick ${mode}-style conversation?`);
-  }
-  if (type === "Bold / Direct") {
-    return h(`Hi ${between},\n\nI need to be direct about ${situation}. This is important to me and I’d like it to change. Can we schedule a ${mode}-style conversation to resolve it?`);
-  }
-  return h(`Hi ${between},\n\nAbout ${situation}: here’s a short suggestion — propose a time to talk and a clear next step. Thanks.`);
 }
