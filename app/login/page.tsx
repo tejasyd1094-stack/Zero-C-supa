@@ -1,29 +1,53 @@
 "use client";
 
 import { useState } from "react";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
 
-  async function sendMagic() {
-    if (!email.includes("@")) return alert("Enter valid email");
-    const res = await fetch("/api/auth/magiclink", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        redirectTo: (process.env.NEXT_PUBLIC_APP_URL || "https://zero-c-supa.vercel.app") + "/dashboard"
-      })
+  async function loginWithEmail() {
+    setMessage("");
+
+    const supabase = supabaseBrowser();
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+      },
     });
-    const j = await res.json();
-    if (res.ok) alert("Check your email for the magic link");
-    else alert(j.error || "Failed to send");
+
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setMessage("Magic link sent! Check your email.");
+    }
   }
 
   return (
-    <div>
-      <input value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="you@example.com" />
-      <button onClick={sendMagic}>Send magic link</button>
+    <div className="max-w-md mx-auto mt-10 text-white">
+      <h1 className="text-3xl font-semibold mb-6">Login</h1>
+
+      <input
+        type="email"
+        placeholder="Enter your email"
+        className="w-full px-4 py-2 rounded bg-[#0d1730] border border-white/10"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+
+      <button
+        onClick={loginWithEmail}
+        className="w-full mt-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+      >
+        Send Magic Link
+      </button>
+
+      {message && (
+        <p className="mt-4 text-center text-sm text-white/70">{message}</p>
+      )}
     </div>
   );
 }

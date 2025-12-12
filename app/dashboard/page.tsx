@@ -1,35 +1,54 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import HistoryModal from "@/components/HistoryModal";
+import Link from "next/link";
 
-export default function Dashboard() {
-  const [trialsLeft, setTrialsLeft] = useState<number | null>(null);
+export default function DashboardPage() {
+  const [user, setUser] = useState<any>(null);
+  const [credits, setCredits] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      const email = localStorage.getItem("zc_email") || "";
-      if (!email) {
-        setTrialsLeft(3);
-        return;
-      }
-      const res = await fetch("/api/usage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
-      if (res.ok) {
-        const j = await res.json();
-        setTrialsLeft(Math.max(0, 3 - (j.count || 0)));
-      }
-    })();
+    const supabase = supabaseBrowser();
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      if (data.user) loadCredits(data.user.id);
+    });
   }, []);
 
+  async function loadCredits(uid: string) {
+    const { data } = await supabaseBrowser()
+      .from("usage_limits")
+      .select("credits")
+      .eq("user_id", uid)
+      .single();
+
+    setCredits(data?.credits ?? 0);
+  }
+
   return (
-    <div className="py-12 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+    <div className="p-6 max-w-3xl mx-auto">
+      <h1 className="text-xl font-bold">Dashboard</h1>
+
       <div className="mt-4">
-        Free trials left: {trialsLeft === null ? "…" : trialsLeft}
+        <b>Credits:</b> {credits}
+        {credits === 0 && (
+          <Link href="/pricing" className="ml-3 text-blue-400">
+            Buy more
+          </Link>
+        )}
       </div>
+
+      <div className="mt-6 flex gap-3">
+        <button onClick={() => setShowHistory(true)}>View History</button>
+        <Link href="/generator">Generate</Link>
+      </div>
+
+      {showHistory && user && (
+        <HistoryModal userId={user.id} onClose={() => setShowHistory(false)} />
+      )}
     </div>
   );
 }

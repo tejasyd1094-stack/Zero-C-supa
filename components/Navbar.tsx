@@ -1,80 +1,54 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useAuth } from "@/app/providers";
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function Navbar() {
-  const { user } = useAuth();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const supabase = supabaseBrowser();
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (_e, session) => setUser(session?.user)
+    );
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   return (
-    <nav className="flex items-center justify-between py-4">
-      {/* LEFT SECTION */}
+    <nav className="flex items-center justify-between px-6 py-4">
       <Link href="/" className="flex items-center gap-3">
-        <Image
-          src="/logo.png"
-          alt="Logo"
-          width={40}
-          height={40}
-          className="rounded-md"
-        />
-
-        {/* Hide text if user is logged in */}
-        {!user && (
-          <span className="font-bold text-lg tracking-wide text-white">
-            Zero Conflict
-          </span>
-        )}
+        <Image src="/logo.png" width={36} height={36} alt="logo" />
       </Link>
 
-      {/* RIGHT SECTION */}
-      <div className="flex gap-4 items-center text-sm">
-        <Link
-          href="/pricing"
-          className="text-white/70 hover:text-white transition"
-        >
-          Pricing
-        </Link>
+      <div className="flex gap-4 items-center">
+        <Link href="/pricing">Pricing</Link>
+        <Link href="/generator">Generate</Link>
 
-        <Link
-          href="/generator"
-          className="text-white/70 hover:text-white transition"
-        >
-          Generate
-        </Link>
-
-        {/* Auth Toggle */}
-        {user ? (
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-white/80">
-              Dashboard
+        {!user ? (
+          <>
+            <Link href="/login">Login</Link>
+            <Link href="/signup" className="font-semibold text-blue-400">
+              Sign up
             </Link>
-            <LogoutButton />
-          </div>
+          </>
         ) : (
-          <Link
-            href="/login"
-            className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20"
-          >
-            Login
-          </Link>
+          <>
+            <Link href="/dashboard">Dashboard</Link>
+            <button
+              onClick={async () => {
+                await supabaseBrowser().auth.signOut();
+                location.href = "/";
+              }}
+            >
+              Logout
+            </button>
+          </>
         )}
       </div>
     </nav>
-  );
-}
-
-// Logout Component
-function LogoutButton() {
-  async function logout() {
-    const { supabaseBrowser } = await import("@/lib/supabaseClient");
-    await supabaseBrowser.auth.signOut();
-    window.location.href = "/";
-  }
-
-  return (
-    <button className="px-3 py-2 bg-white/10 rounded-lg hover:bg-white/20">
-      Logout
-    </button>
   );
 }
