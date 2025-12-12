@@ -1,80 +1,56 @@
-// components/Navbar.tsx
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/app/providers";
-import { supabaseBrowser } from "@/lib/supabaseClient";
+import { useEffect, useState } from "react";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function Navbar() {
-  const { user } = useAuth();
-  const router = useRouter();
+  const [user, setUser] = useState(null);
 
-  async function handleLogout() {
-    try {
-      const { error } = await supabaseBrowser.auth.signOut();
-      if (error) {
-        console.error("Logout error:", error);
-        alert("Logout failed. Try again.");
-        return;
-      }
-      router.push("/");
-      router.refresh();
-    } catch (err) {
-      console.error(err);
-      alert("Logout failed. Try again.");
-    }
-  }
+  useEffect(() => {
+    const supabase = supabaseBrowser();
+
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
-    <nav className="flex items-center justify-between py-3 px-4 md:px-8">
-      {/* Left: logo + brand text (brand text hidden on small screens to avoid overlap) */}
-      <Link href="/" className="flex items-center gap-3">
-        <Image src="/logo.png" alt="Logo" width={42} height={42} className="rounded-md" />
-        {/* hidden on small screens to avoid overlap; visible on md+ */}
-        <span className="hidden md:inline-block font-bold text-lg tracking-wide text-white">
-          Zero Conflict
-        </span>
+    <nav className="flex justify-between items-center py-4">
+      <Link href="/">
+        <div className="flex items-center space-x-2">
+          <img src="/logo.png" alt="Zero Conflict" className="w-10" />
+        </div>
       </Link>
 
-      {/* Right menu */}
-      <div className="flex items-center gap-4">
-        <Link href="/pricing" className="text-white/80 hover:text-white">
-          Pricing
-        </Link>
+      <div className="flex items-center space-x-4">
 
-        <Link href="/generator" className="text-white/80 hover:text-white">
-          Generate
-        </Link>
-
-        {!user ? (
+        {user ? (
           <>
-            <Link
-              href="/login"
-              className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition"
-            >
-              Login
-            </Link>
-            <Link
-              href="/signup"
-              className="px-3 py-2 rounded-lg bg-gradient-to-r from-[#21D4FD] to-[#B721FF] text-black font-semibold"
-            >
-              Sign Up
-            </Link>
-          </>
-        ) : (
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-white/80 hover:text-white">
-              Dashboard
-            </Link>
+            <Link href="/dashboard">Dashboard</Link>
             <button
-              onClick={handleLogout}
-              className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20"
+              onClick={async () => {
+                const supabase = supabaseBrowser();
+                await supabase.auth.signOut();
+              }}
+              className="text-red-400"
             >
               Logout
             </button>
-          </div>
+          </>
+        ) : (
+          <>
+            <Link href="/login">Login</Link>
+            <Link href="/signup">Sign Up</Link>
+          </>
         )}
       </div>
     </nav>
