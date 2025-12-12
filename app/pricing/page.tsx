@@ -1,8 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabaseBrowser } from "@/lib/supabaseClient";
-
 declare global {
   interface Window {
     Razorpay: any;
@@ -11,52 +8,38 @@ declare global {
 
 const RAZORPAY_KEY = "rzp_live_RdjxnHnfeuUS06";
 
+function openRazorpay(amount: number, credits: number) {
+  const options = {
+    key: RAZORPAY_KEY,
+    amount: amount * 100,
+    currency: "INR",
+    name: "Zero Conflict AI",
+    description: `${credits} credits purchase`,
+    image: "/logo.png",
+
+    // ✅ Webhook-safe notes (user resolved server-side)
+    notes: {
+      credits: String(credits),
+      source: "pricing_page",
+    },
+
+    handler: function (response: any) {
+      alert(
+        "Payment successful ✅\nPayment ID: " +
+          response.razorpay_payment_id
+      );
+    },
+
+    theme: {
+      color: "#1e2a5a",
+    },
+  };
+
+  const rzp = new window.Razorpay(options);
+  rzp.open();
+}
+
 export default function PricingPage() {
-  const [userId, setUserId] = useState<string | null>(null);
-
-  useEffect(() => {
-    supabaseBrowser.auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id ?? null);
-    });
-  }, []);
-
-  function openRazorpay(amount: number, credits: number) {
-    if (!userId) {
-      alert("Please login to continue");
-      return;
-    }
-
-    const options = {
-      key: RAZORPAY_KEY,
-      amount: amount * 100, // INR → paise
-      currency: "INR",
-      name: "Zero Conflict AI",
-      description: `${credits} credits purchase`,
-      image: "/logo.png",
-
-      // ✅ MOST IMPORTANT PART
-      notes: {
-        user_id: userId,
-        credits: String(credits),
-      },
-
-      handler: function (response: any) {
-        alert(
-          "Payment successful ✅\nPayment ID: " +
-            response.razorpay_payment_id
-        );
-        // Credits will be added via webhook
-      },
-
-      theme: {
-        color: "#1e2a5a",
-      },
-    };
-
-    const rzp = new window.Razorpay(options);
-    rzp.open();
-  }
-
   return (
     <div className="max-w-5xl mx-auto py-16 px-4">
       <h1 className="text-4xl font-bold text-white text-center">
@@ -68,7 +51,7 @@ export default function PricingPage() {
 
       <div className="grid md:grid-cols-3 gap-6 mt-12">
 
-        {/* FREE */}
+        {/* Free */}
         <div className="bg-[#0f1a35] p-6 rounded-xl border border-white/10">
           <h3 className="text-xl font-semibold text-white">Free</h3>
           <p className="text-3xl font-bold text-white mt-2">₹0</p>
