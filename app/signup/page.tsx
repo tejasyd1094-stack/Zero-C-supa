@@ -6,28 +6,49 @@ import { supabaseBrowser } from "@/lib/supabaseClient";
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
+  // Passwordless email (magic link)
   async function signupWithEmail() {
+    setLoading(true);
     setMessage("");
-    const { error } = await supabaseBrowser.auth.signUp({
-      email,
-      options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
-      },
-    });
 
-    if (error) setMessage(error.message);
-    else setMessage("Check your email for the magic login link!");
+    try {
+      const { error } = await supabaseBrowser.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+        },
+      });
+
+      if (error) {
+        setMessage(error.message);
+      } else {
+        setMessage("Magic link sent — check your email to continue.");
+      }
+    } catch (err: any) {
+      setMessage(err?.message || "Failed to send magic link.");
+    } finally {
+      setLoading(false);
+    }
   }
 
+  // Google OAuth
   async function signupWithGoogle() {
-    const { error } = await supabaseBrowser.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
-      },
-    });
-    if (error) setMessage(error.message);
+    setMessage("");
+    try {
+      const { error } = await supabaseBrowser.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+        },
+      });
+
+      if (error) setMessage(error.message);
+      // otherwise redirects to Google
+    } catch (err: any) {
+      setMessage(err?.message || "OAuth failed.");
+    }
   }
 
   return (
@@ -37,31 +58,30 @@ export default function SignupPage() {
       <label className="block text-white/70 mb-2">Email Address</label>
       <input
         type="email"
-        placeholder="Enter your email"
-        className="w-full px-4 py-2 rounded bg-white/10"
+        placeholder="you@example.com"
+        className="w-full px-4 py-2 rounded bg-white/10 text-white"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
       />
 
       <button
-        className="mt-4 w-full py-2 bg-gradient-to-r from-[#21D4FD] to-[#B721FF] text-black rounded-lg font-semibold"
         onClick={signupWithEmail}
+        disabled={loading}
+        className="mt-4 w-full py-2 bg-gradient-to-r from-[#21D4FD] to-[#B721FF] text-black rounded-lg font-semibold"
       >
-        Sign Up with Email
+        {loading ? "Sending magic link..." : "Sign Up with Email"}
       </button>
 
       <p className="text-center my-4 text-white/50">or</p>
 
       <button
-        className="w-full py-2 bg-white text-black rounded-lg"
         onClick={signupWithGoogle}
+        className="w-full py-2 bg-white text-black rounded-lg"
       >
         Continue with Google
       </button>
 
-      {message && (
-        <p className="text-center text-sm text-red-400 mt-4">{message}</p>
-      )}
+      {message && <p className="text-center text-sm text-red-400 mt-4">{message}</p>}
     </div>
   );
 }
