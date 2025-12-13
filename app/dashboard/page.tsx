@@ -2,53 +2,60 @@
 
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
-import HistoryModal from "@/components/HistoryModal";
-import Link from "next/link";
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null);
-  const [credits, setCredits] = useState(0);
-  const [showHistory, setShowHistory] = useState(false);
+  const [credits, setCredits] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = supabaseBrowser();
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-      if (data.user) loadCredits(data.user.id);
-    });
+    async function loadCredits() {
+      const { data: { user } } = await supabaseBrowser.auth.getUser();
+
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabaseBrowser
+        .from("usage_limits")
+        .select("used_count, max_credits")
+        .eq("user_id", user.id)
+        .single();
+
+      if (error) {
+        console.error("Credit fetch error:", error);
+        setCredits(0);
+      } else {
+        setCredits(data.max_credits - data.used_count);
+      }
+
+      setLoading(false);
+    }
+
+    loadCredits();
   }, []);
 
-  async function loadCredits(uid: string) {
-    const { data } = await supabaseBrowser()
-      .from("usage_limits")
-      .select("credits")
-      .eq("user_id", uid)
-      .single();
-
-    setCredits(data?.credits ?? 0);
+  if (loading) {
+    return <p className="text-white/60">Loading dashboard…</p>;
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-xl font-bold">Dashboard</h1>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold">Dashboard</h1>
 
-      <div className="mt-4">
-        <b>Credits:</b> {credits}
+      <div className="bg-[#0f1a35] rounded-xl p-6 border border-white/10">
+        <p className="text-white/60">Credits remaining</p>
+        <p className="text-3xl font-bold">{credits ?? 0}</p>
+
         {credits === 0 && (
-          <Link href="/pricing" className="ml-3 text-blue-400">
-            Buy more
-          </Link>
+          <a
+            href="/pricing"
+            className="inline-block mt-4 text-sm text-blue-400 hover:underline"
+          >
+            Buy more credits
+          </a>
         )}
       </div>
-
-      <div className="mt-6 flex gap-3">
-        <button onClick={() => setShowHistory(true)}>View History</button>
-        <Link href="/generator">Generate</Link>
-      </div>
-
-      {showHistory && user && (
-        <HistoryModal userId={user.id} onClose={() => setShowHistory(false)} />
-      )}
     </div>
   );
 }
