@@ -1,56 +1,77 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { supabaseBrowser } from "@/lib/supabaseClient";
 
 export default function DashboardPage() {
-  const [credits, setCredits] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [credits, setCredits] = useState<number>(0);
+  const [userId, setUserId] = useState<string | null>(null);
 
+  /* -----------------------------
+     1. LOAD USER + INITIAL CREDITS
+  ------------------------------ */
   useEffect(() => {
-    async function loadCredits() {
-      const { data: { user } } = await supabaseBrowser.auth.getUser();
+    const loadUser = async () => {
+      const { data } = await supabaseBrowser.auth.getUser();
+      if (!data.user) return;
 
-      if (!user) {
-        setLoading(false);
-        return;
-      }
+      setUserId(data.user.id);
 
-      const { data, error } = await supabaseBrowser
+      const { data: usage } = await supabaseBrowser
         .from("usage_limits")
         .select("used_count, max_credits")
-        .eq("user_id", user.id)
+        .eq("user_id", data.user.id)
         .single();
 
-      if (error) {
-        console.error("Credit fetch error:", error);
-        setCredits(0);
-      } else {
-        setCredits(data.max_credits - data.used_count);
+      if (usage) {
+        setCredits(usage.max_credits - usage.used_count);
       }
+    };
 
-      setLoading(false);
-    }
-
-    loadCredits();
+    loadUser();
   }, []);
 
-  if (loading) {
-    return <p className="text-white/60">Loading dashboard…</p>;
-  }
+  /* -----------------------------
+     2. REAL-TIME CREDIT UPDATES
+  ------------------------------ */
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabaseBrowser
+      .channel("usage-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "usage_limits",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const newCredits =
+            payload.new.max_credits - payload.new.used_count;
+          setCredits(newCredits);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabaseBrowser.removeChannel(channel);
+    };
+  }, [userId]);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+    <div className="p-6">
+      <h1 className="text-xl font-semibold mb-4">Dashboard</h1>
 
-      <div className="bg-[#0f1a35] rounded-xl p-6 border border-white/10">
-        <p className="text-white/60">Credits remaining</p>
-        <p className="text-3xl font-bold">{credits ?? 0}</p>
+      <div className="bg-[#0f1a35] p-4 rounded-xl border border-white/10">
+        <p className="text-white/70 text-sm">Credits Available</p>
+        <p className="text-3xl font-bold text-white">{credits}</p>
 
         {credits === 0 && (
           <a
             href="/pricing"
-            className="inline-block mt-4 text-sm text-blue-400 hover:underline"
+            className="inline-block mt-4 text-purple-400 underline"
           >
             Buy more credits
           </a>
