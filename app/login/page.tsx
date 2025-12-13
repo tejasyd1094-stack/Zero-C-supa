@@ -2,52 +2,71 @@
 
 import { useState } from "react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   async function loginWithEmail() {
-    setMessage("");
+    setLoading(true);
 
-    const supabase = supabaseBrowser();
-
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabaseBrowser.auth.signInWithOtp({
       email,
       options: {
         emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
       },
     });
 
+    setLoading(false);
+
     if (error) {
-      setMessage(error.message);
+      alert(error.message);
     } else {
-      setMessage("Magic link sent! Check your email.");
+      alert("Check your email to login");
     }
   }
 
+  async function loginWithGoogle() {
+    await supabaseBrowser.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+      },
+    });
+  }
+
   return (
-    <div className="max-w-md mx-auto mt-10 text-white">
-      <h1 className="text-3xl font-semibold mb-6">Login</h1>
+    <div className="max-w-md mx-auto mt-20 space-y-6">
+      <h1 className="text-2xl font-semibold text-center">
+        Login to Zero Conflict AI
+      </h1>
+
+      <button
+        onClick={loginWithGoogle}
+        className="w-full bg-white text-black py-2 rounded-lg font-medium"
+      >
+        Continue with Google
+      </button>
+
+      <div className="text-center text-white/40">or</div>
 
       <input
         type="email"
-        placeholder="Enter your email"
-        className="w-full px-4 py-2 rounded bg-[#0d1730] border border-white/10"
+        placeholder="you@email.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
+        className="w-full p-2 rounded bg-black border border-white/20"
       />
 
       <button
         onClick={loginWithEmail}
-        className="w-full mt-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+        disabled={loading}
+        className="w-full bg-blue-600 py-2 rounded-lg"
       >
-        Send Magic Link
+        Login
       </button>
-
-      {message && (
-        <p className="mt-4 text-center text-sm text-white/70">{message}</p>
-      )}
     </div>
   );
 }
