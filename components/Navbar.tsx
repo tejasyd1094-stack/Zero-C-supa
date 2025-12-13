@@ -1,52 +1,42 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function Navbar() {
-  const [user, setUser] = useState<any>(null);
+  const [loggedIn, setLoggedIn] = useState(false);
 
   useEffect(() => {
-    const supabase = supabaseBrowser();
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    supabaseBrowser.auth.getUser().then(({ data }) => {
+      setLoggedIn(!!data.user);
+    });
 
-    const { data: sub } = supabase.auth.onAuthStateChange(
-      (_e, session) => setUser(session?.user)
+    const { data: sub } = supabaseBrowser.auth.onAuthStateChange(
+      (_, session) => {
+        setLoggedIn(!!session);
+      }
     );
-    return () => sub.subscription.unsubscribe();
+
+    return () => {
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   return (
-    <nav className="flex items-center justify-between px-6 py-4">
-      <Link href="/" className="flex items-center gap-3">
-        <Image src="/logo.png" width={36} height={36} alt="logo" />
+    <nav className="flex items-center justify-between py-4">
+      <Link href="/" className="font-bold">
+        <img src="/logo.png" className="h-8" />
       </Link>
 
-      <div className="flex gap-4 items-center">
+      <div className="flex gap-4">
         <Link href="/pricing">Pricing</Link>
         <Link href="/generator">Generate</Link>
 
-        {!user ? (
-          <>
-            <Link href="/login">Login</Link>
-            <Link href="/signup" className="font-semibold text-blue-400">
-              Sign up
-            </Link>
-          </>
+        {loggedIn ? (
+          <Link href="/dashboard">Dashboard</Link>
         ) : (
-          <>
-            <Link href="/dashboard">Dashboard</Link>
-            <button
-              onClick={async () => {
-                await supabaseBrowser().auth.signOut();
-                location.href = "/";
-              }}
-            >
-              Logout
-            </button>
-          </>
+          <Link href="/login">Login</Link>
         )}
       </div>
     </nav>
