@@ -1,123 +1,81 @@
 "use client";
 
-<<<<<<< HEAD
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { supabaseBrowser } from "@/lib/supabaseBrowser";
-
-export default function Navbar() {
-  const [loggedIn, setLoggedIn] = useState(false);
-
-  useEffect(() => {
-    supabaseBrowser.auth.getUser().then(({ data }) => {
-      setLoggedIn(!!data.user);
-    });
-
-    const { data: sub } = supabaseBrowser.auth.onAuthStateChange(
-      (_, session) => {
-        setLoggedIn(!!session);
-      }
-    );
-
-    return () => {
-      sub.subscription.unsubscribe();
-    };
-=======
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabaseClient";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function Navbar() {
-  const [user, setUser] = useState<any>(null);
   const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabaseBrowser.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
+    const supabase = supabaseBrowser();
+
+    // Initial session check
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      setLoading(false);
     });
 
-    // Listen for auth changes
+    // Listen to auth changes
     const {
       data: { subscription },
-    } = supabaseBrowser.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
->>>>>>> master
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function handleLogout() {
-    await supabaseBrowser.auth.signOut();
-    router.push("/login");
+    const supabase = supabaseBrowser();
+    await supabase.auth.signOut();
+    setUser(null);
+    router.push("/");
+    router.refresh();
   }
 
+  if (loading) return null;
+
   return (
-<<<<<<< HEAD
-    <nav className="flex items-center justify-between py-4">
-      <Link href="/" className="font-bold">
-        <img src="/logo.png" className="h-8" />
-      </Link>
-
-      <div className="flex gap-4">
-        <Link href="/pricing">Pricing</Link>
-        <Link href="/generator">Generate</Link>
-
-        {loggedIn ? (
-          <Link href="/dashboard">Dashboard</Link>
-        ) : (
-          <Link href="/login">Login</Link>
-        )}
-=======
-    <nav className="w-full sticky top-0 z-50 bg-[#0b1220] border-b border-white/10">
+    <nav className="w-full border-b border-white/10 bg-[#0b1020]">
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-        {/* Logo */}
+        {/* Logo only – no overlapping text */}
         <Link href="/" className="flex items-center gap-2">
-          <img src="/logo.png" alt="Zero Conflict AI" className="h-8" />
-          {!user && (
-            <span className="text-white font-semibold text-sm">
-              Zero Conflict AI
-            </span>
-          )}
+          <img src="/logo.png" alt="Zero Conflict AI" className="h-7 w-auto" />
         </Link>
 
-        {/* Right side */}
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex items-center gap-6 text-sm">
+          <Link href="/pricing" className="text-white/80 hover:text-white">
+            Pricing
+          </Link>
+
+          {user && (
+            <Link href="/dashboard" className="text-white/80 hover:text-white">
+              Dashboard
+            </Link>
+          )}
+
           {!user ? (
-            <>
-              <Link
-                href="/pricing"
-                className="text-white/70 hover:text-white transition"
-              >
-                Pricing
-              </Link>
-              <Link
-                href="/login"
-                className="px-4 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 transition text-white"
-              >
-                Login
-              </Link>
-            </>
+            <Link
+              href="/login"
+              className="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              Login
+            </Link>
           ) : (
-            <>
-              <Link
-                href="/dashboard"
-                className="text-white/70 hover:text-white transition"
-              >
-                Dashboard
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-1.5 rounded-md border border-white/20 text-white/80 hover:text-white hover:border-white transition"
-              >
-                Logout
-              </button>
-            </>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-1.5 rounded bg-white/10 hover:bg-white/20 text-white"
+            >
+              Logout
+            </button>
           )}
         </div>
->>>>>>> master
       </div>
     </nav>
   );
