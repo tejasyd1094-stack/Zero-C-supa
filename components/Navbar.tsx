@@ -1,28 +1,24 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function Navbar() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = supabaseBrowser();
-
-    // Initial session check
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-      setLoading(false);
+    // Initial user fetch
+    supabaseBrowser.auth.getUser().then(({ data }) => {
+      setUser(data.user ?? null);
     });
 
     // Listen to auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabaseBrowser.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
@@ -32,30 +28,29 @@ export default function Navbar() {
   }, []);
 
   async function handleLogout() {
-    const supabase = supabaseBrowser();
-    await supabase.auth.signOut();
-    setUser(null);
+    await supabaseBrowser.auth.signOut();
     router.push("/");
-    router.refresh();
   }
 
-  if (loading) return null;
-
   return (
-    <nav className="w-full border-b border-white/10 bg-[#0b1020]">
-      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-        {/* Logo only – no overlapping text */}
+    <nav className="w-full border-b border-white/10 bg-[#0b1228]">
+      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <img src="/logo.png" alt="Zero Conflict AI" className="h-7 w-auto" />
+          <img src="/logo.png" alt="Zero Conflict AI" className="h-8 w-8" />
         </Link>
 
-        <div className="flex items-center gap-6 text-sm">
-          <Link href="/pricing" className="text-white/80 hover:text-white">
+        {/* Links */}
+        <div className="flex items-center gap-4 text-sm">
+          <Link href="/pricing" className="text-white/70 hover:text-white">
             Pricing
           </Link>
 
           {user && (
-            <Link href="/dashboard" className="text-white/80 hover:text-white">
+            <Link
+              href="/dashboard"
+              className="text-white/70 hover:text-white"
+            >
               Dashboard
             </Link>
           )}
@@ -63,14 +58,14 @@ export default function Navbar() {
           {!user ? (
             <Link
               href="/login"
-              className="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="px-3 py-1.5 rounded-md bg-white text-black font-medium"
             >
               Login
             </Link>
           ) : (
             <button
               onClick={handleLogout}
-              className="px-4 py-1.5 rounded bg-white/10 hover:bg-white/20 text-white"
+              className="px-3 py-1.5 rounded-md bg-white text-black font-medium"
             >
               Logout
             </button>
