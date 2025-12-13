@@ -1,18 +1,31 @@
 "use client";
 
-import { useState } from "react";
-import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { useState, useEffect } from "react";
+import { supabaseBrowser } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  async function loginWithEmail() {
+  // Redirect if already logged in
+  useEffect(() => {
+    supabaseBrowser.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        router.replace("/dashboard");
+      }
+    });
+  }, [router]);
+
+  async function handleLogin() {
+    if (!email) return;
+
+    setLoading(true);
     setMessage("");
 
-    const supabase = supabaseBrowser();
-
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabaseBrowser.auth.signInWithOtp({
       email,
       options: {
         emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
@@ -22,32 +35,48 @@ export default function LoginPage() {
     if (error) {
       setMessage(error.message);
     } else {
-      setMessage("Magic link sent! Check your email.");
+      setMessage("Check your email to continue.");
     }
+
+    setLoading(false);
   }
 
   return (
-    <div className="max-w-md mx-auto mt-10 text-white">
-      <h1 className="text-3xl font-semibold mb-6">Login</h1>
+    <div className="min-h-screen flex items-center justify-center bg-[#0b1220] text-white">
+      <div className="w-full max-w-md p-6 rounded-xl border border-white/10 bg-[#0f1a35]">
+        {/* Logo */}
+        <div className="flex justify-center mb-4">
+          <img src="/logo.png" alt="Zero Conflict AI" className="h-10" />
+        </div>
 
-      <input
-        type="email"
-        placeholder="Enter your email"
-        className="w-full px-4 py-2 rounded bg-[#0d1730] border border-white/10"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
+        <h1 className="text-2xl font-semibold text-center">Login</h1>
 
-      <button
-        onClick={loginWithEmail}
-        className="w-full mt-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
-      >
-        Send Magic Link
-      </button>
+        <p className="text-white/60 text-sm text-center mt-2">
+          Enter your email to access Zero Conflict AI
+        </p>
 
-      {message && (
-        <p className="mt-4 text-center text-sm text-white/70">{message}</p>
-      )}
+        <input
+          type="email"
+          placeholder="you@example.com"
+          className="w-full mt-6 px-4 py-3 rounded-lg bg-black/30 border border-white/10 focus:outline-none"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+
+        <button
+          onClick={handleLogin}
+          disabled={loading || !email}
+          className="w-full mt-4 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 transition disabled:opacity-50"
+        >
+          {loading ? "Sending..." : "Login"}
+        </button>
+
+        {message && (
+          <p className="mt-4 text-center text-sm text-white/70">
+            {message}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
