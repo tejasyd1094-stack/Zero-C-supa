@@ -1,29 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { supabaseBrowser } from "@/lib/supabaseClient";
+import { useState } from "react";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // Redirect if already logged in
-  useEffect(() => {
-    supabaseBrowser.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        router.replace("/dashboard");
-      }
-    });
-  }, [router]);
-
-  async function handleLogin() {
-    if (!email) return;
-
+  async function loginWithEmail() {
     setLoading(true);
-    setMessage("");
 
     const { error } = await supabaseBrowser.auth.signInWithOtp({
       email,
@@ -32,51 +19,54 @@ export default function LoginPage() {
       },
     });
 
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage("Check your email to continue.");
-    }
-
     setLoading(false);
+
+    if (error) {
+      alert(error.message);
+    } else {
+      alert("Check your email to login");
+    }
+  }
+
+  async function loginWithGoogle() {
+    await supabaseBrowser.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+      },
+    });
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0b1220] text-white">
-      <div className="w-full max-w-md p-6 rounded-xl border border-white/10 bg-[#0f1a35]">
-        {/* Logo */}
-        <div className="flex justify-center mb-4">
-          <img src="/logo.png" alt="Zero Conflict AI" className="h-10" />
-        </div>
+    <div className="max-w-md mx-auto mt-20 space-y-6">
+      <h1 className="text-2xl font-semibold text-center">
+        Login to Zero Conflict AI
+      </h1>
 
-        <h1 className="text-2xl font-semibold text-center">Login</h1>
+      <button
+        onClick={loginWithGoogle}
+        className="w-full bg-white text-black py-2 rounded-lg font-medium"
+      >
+        Continue with Google
+      </button>
 
-        <p className="text-white/60 text-sm text-center mt-2">
-          Enter your email to access Zero Conflict AI
-        </p>
+      <div className="text-center text-white/40">or</div>
 
-        <input
-          type="email"
-          placeholder="you@example.com"
-          className="w-full mt-6 px-4 py-3 rounded-lg bg-black/30 border border-white/10 focus:outline-none"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+      <input
+        type="email"
+        placeholder="you@email.com"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="w-full p-2 rounded bg-black border border-white/20"
+      />
 
-        <button
-          onClick={handleLogin}
-          disabled={loading || !email}
-          className="w-full mt-4 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 transition disabled:opacity-50"
-        >
-          {loading ? "Sending..." : "Login"}
-        </button>
-
-        {message && (
-          <p className="mt-4 text-center text-sm text-white/70">
-            {message}
-          </p>
-        )}
-      </div>
+      <button
+        onClick={loginWithEmail}
+        disabled={loading}
+        className="w-full bg-blue-600 py-2 rounded-lg"
+      >
+        Login
+      </button>
     </div>
   );
 }
