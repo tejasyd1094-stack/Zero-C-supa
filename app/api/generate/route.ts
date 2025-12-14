@@ -1,49 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import OpenAI from "openai";
-import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // REQUIRED for server updates
-);
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
-
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const {
-      situation,
-      role,
-      communicationMode,
-      tone,
-      behaviour,
-    } = body;
+    const supabase = createRouteHandlerClient({ cookies });
 
-    /* -------------------------------
-       1. AUTH: Get user from header
-    -------------------------------- */
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-
+    // 1️⃣ AUTH CHECK (THIS WAS FAILING BEFORE)
     const {
       data: { user },
-      error: userError,
-    } = await supabase.auth.getUser(token);
+    } = await supabase.auth.getUser();
 
-    if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
-    /* -------------------------------
-       2. CHECK CREDITS
-    -------------------------------- */
+    // 2️⃣ CHECK CREDITS
     const { data: usage, error: usageError } = await supabase
       .from("usage_limits")
       .select("used_count, max_credits")
@@ -52,88 +28,83 @@ export async function POST(req: NextRequest) {
 
     if (usageError || !usage) {
       return NextResponse.json(
-        { error: "Usage data not found" },
+        { error: "Usage record not found" },
         { status: 400 }
       );
     }
 
     if (usage.used_count >= usage.max_credits) {
       return NextResponse.json(
-        { error: "No credits remaining" },
+        { error: "No credits left" },
         { status: 403 }
       );
     }
 
-    /* -------------------------------
-       3. BUILD PROMPT (HINGLISH SAFE)
-    -------------------------------- */
+    // 3️⃣ READ REQUEST BODY
+    const body = await req.json();
+    const {
+      situation,
+      role,
+      mode,
+      behaviour,
+      language,
+    } = body;
+
+    // 4️⃣ OPENAI
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY!,
+    });
+
     const prompt = `
 You are Zero Conflict AI.
 
-Generate 3 scripts:
+Generate 3 versions of a script:
 1. Empathetic
 2. Bold
 3. Clever
 
+Context:
 Situation: ${situation}
-Relationship: ${role}
-Mode: ${communicationMode}
+Talking to: ${role}
+Mode: ${mode}
 Person behaviour: ${behaviour}
 
-Rules:
-- Speak in first person
-- Natural English or Hinglish
-- No third-person narration
-- Polite but clear
+Language style:
+- Hinglish allowed naturally
+- Sound human, not robotic
+- First-person tone (I / me)
+
+Return JSON strictly.
 `;
 
-    /* -------------------------------
-       4. CALL OPENAI
-    -------------------------------- */
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.7,
     });
 
-    const text = completion.choices[0]?.message?.content;
+    const responseText = completion.choices[0].message.content;
 
-    if (!text) {
-      throw new Error("Empty response from OpenAI");
-    }
-
-    /* -------------------------------
-       5. SAVE SCRIPT HISTORY
-    -------------------------------- */
+    // 5️⃣ SAVE SCRIPT
     await supabase.from("generated_scripts").insert({
       user_id: user.id,
-      content: text,
+      content: responseText,
     });
 
-    /* -------------------------------
-       6. INCREMENT CREDIT USAGE
-       🔥 THIS FIXES YOUR DASHBOARD
-    -------------------------------- */
+    // 6️⃣ DEDUCT CREDIT (THIS TRIGGERS REALTIME UPDATE)
     await supabase
       .from("usage_limits")
-      .update({
-        used_count: usage.used_count + 1,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ used_count: usage.used_count + 1 })
       .eq("user_id", user.id);
 
-    /* -------------------------------
-       7. RETURN RESPONSE
-    -------------------------------- */
     return NextResponse.json({
       success: true,
-      scripts: text,
-      remainingCredits: usage.max_credits - (usage.used_count + 1),
+      scripts: responseText,
     });
-  } catch (error: any) {
-    console.error("Generate API error:", error);
+  } catch (err: any) {
+    console.error("Generate error:", err);
     return NextResponse.json(
-      { error: "Failed to generate script" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
