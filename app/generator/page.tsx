@@ -4,35 +4,67 @@ import { useContext, useState } from "react";
 import { AuthContext } from "@/app/providers";
 
 export default function GeneratorPage() {
-  const { session, loading } = useContext(AuthContext);
-  const user = session?.user;
+  const { user, loading } = useContext(AuthContext);
 
   const [error, setError] = useState("");
+  const [result, setResult] = useState("");
 
-  const generateScript = async () => {
+  if (loading) {
+    return <p className="p-6">Loading...</p>;
+  }
+
+  // 🚫 NOT LOGGED IN
+  if (!user) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-red-500 font-medium">
+          Please log in to generate scripts
+        </p>
+      </div>
+    );
+  }
+
+  async function generateScript() {
     setError("");
+    setResult("");
 
-    if (loading) {
-      setError("Checking login status, please wait...");
-      return;
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: "Generate a respectful conflict resolution script",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Something went wrong");
+        return;
+      }
+
+      setResult(data.text);
+    } catch (err) {
+      setError("Failed to generate script");
     }
-
-    if (!user) {
-      setError("Please log in to generate the script.");
-      return;
-    }
-
-    // generation logic continues...
-  };
+  }
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      {loading && (
-        <p className="text-white/60 mb-4">Loading session…</p>
-      )}
+    <div className="p-6 max-w-xl mx-auto">
+      <h1 className="text-xl font-semibold mb-4">Generate Script</h1>
 
-      {/* UI continues */}
-      {error && <p className="text-red-400">{error}</p>}
+      <button
+        onClick={generateScript}
+        className="bg-black text-white px-4 py-2 rounded"
+      >
+        Generate
+      </button>
+
+      {error && <p className="text-red-500 mt-4">{error}</p>}
+      {result && <pre className="mt-4 whitespace-pre-wrap">{result}</pre>}
     </div>
   );
 }
