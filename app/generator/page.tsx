@@ -21,14 +21,11 @@ export default function GeneratorPage() {
 
   // 🔐 Load logged-in user
   useEffect(() => {
-    const supabase = supabaseBrowser();
-
-    supabase.auth.getUser().then(({ data }) => {
+    supabaseBrowser.auth.getUser().then(({ data }) => {
       setUser(data.user ?? null);
     });
   }, []);
 
-  // 🚀 Generate script
   const generateScript = async () => {
     setError("");
     setScripts([]);
@@ -60,13 +57,13 @@ export default function GeneratorPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Something went wrong");
+        setError(data.error || "Failed to generate script");
         return;
       }
 
       setScripts(data.scripts);
-    } catch (err) {
-      setError("Failed to generate script. Please try again.");
+    } catch {
+      setError("Something went wrong. Try again.");
     } finally {
       setLoading(false);
     }
@@ -79,10 +76,9 @@ export default function GeneratorPage() {
       </h1>
 
       <p className="text-white/70 mb-8">
-        Works for office, friends, partners, family — in simple Hinglish.
+        Works for office, friends, partners & family — in Hinglish.
       </p>
 
-      {/* FORM */}
       <div className="space-y-4">
         <textarea
           placeholder="Describe the situation..."
@@ -112,7 +108,7 @@ export default function GeneratorPage() {
           className="w-full p-3 rounded bg-[#0f1a35] text-white border border-white/10"
         >
           <option value="">Mode of communication</option>
-          <option>Face to face conversation</option>
+          <option>Face to face</option>
           <option>WhatsApp / Chat</option>
           <option>Email</option>
           <option>Call</option>
@@ -123,8 +119,8 @@ export default function GeneratorPage() {
           onChange={(e) => setPersonBehavior(e.target.value)}
           className="w-full p-3 rounded bg-[#0f1a35] text-white border border-white/10"
         >
-          <option value="">How is the other person?</option>
-          <option>Calm and understanding</option>
+          <option value="">Person’s behaviour</option>
+          <option>Calm</option>
           <option>Emotional</option>
           <option>Defensive</option>
           <option>Dominating</option>
@@ -139,12 +135,9 @@ export default function GeneratorPage() {
           {loading ? "Generating..." : "Generate Script"}
         </button>
 
-        {error && (
-          <p className="text-red-400 text-sm mt-2">{error}</p>
-        )}
+        {error && <p className="text-red-400 text-sm">{error}</p>}
       </div>
 
-      {/* OUTPUT */}
       {scripts.length > 0 && (
         <div className="mt-10 space-y-6">
           {scripts.map((s, i) => (
