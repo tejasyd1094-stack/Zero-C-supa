@@ -5,8 +5,7 @@ import Navbar from "@/components/Navbar";
 
 export const metadata: Metadata = {
   title: "Zero Conflict AI",
-  description:
-    "AI-powered scripts to handle difficult conversations — at work, in relationships, and in life.",
+  description: "Conflict-free scripts for work and life",
 };
 
 export default function RootLayout({
@@ -16,17 +15,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-        {/* Razorpay Checkout Script */}
-        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-      </head>
-
-      <body className="bg-[#070d1f] text-white">
+      <body className="bg-[#0b1226] text-white">
         <Providers>
-          <div className="min-h-screen flex flex-col">
-            <Navbar />
-            <main className="flex-1">{children}</main>
-          </div>
+          <Navbar />
+          {children}
         </Providers>
       </body>
     </html>
