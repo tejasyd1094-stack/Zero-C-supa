@@ -1,42 +1,42 @@
 "use client";
 
 import { createContext, useEffect, useState } from "react";
-import { createClient, Session } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { Session } from "@supabase/supabase-js";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export const AuthContext = createContext<{
   session: Session | null;
+  loading: boolean;
 }>({
   session: null,
+  loading: true,
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load existing session
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    // Load initial session
+    supabaseBrowser.auth.getSession().then(({ data }) => {
+      setSession(data.session ?? null);
+      setLoading(false);
     });
 
     // Listen to auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+    const { data: listener } =
+      supabaseBrowser.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+        setLoading(false);
+      });
 
     return () => {
-      subscription.unsubscribe();
+      listener.subscription.unsubscribe();
     };
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session }}>
+    <AuthContext.Provider value={{ session, loading }}>
       {children}
     </AuthContext.Provider>
   );
