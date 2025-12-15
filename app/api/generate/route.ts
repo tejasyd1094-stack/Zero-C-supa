@@ -1,101 +1,93 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseServer } from "@/lib/supabaseServer";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const {
-      userId,
-      situation,
-      role,
-      mode,
-      behaviour,
-    } = body;
+  const supabase = supabaseServer();
 
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  // 1️⃣ AUTH CHECK
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    // 1️⃣ Check credits
-    const { data: usage } = await supabase
-      .from("usage_limits")
-      .select("credits")
-      .eq("user_id", userId)
-      .single();
+  if (!user) {
+    return NextResponse.json(
+      { error: "Please log in to generate scripts." },
+      { status: 401 }
+    );
+  }
 
-    if (!usage || usage.credits <= 0) {
-      return NextResponse.json(
-        { error: "No credits left" },
-        { status: 403 }
-      );
-    }
+  // 2️⃣ CREDIT CHECK
+  const { data: usage } = await supabase
+    .from("usage_limits")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
 
-    // 2️⃣ Prompt (first-person, Hinglish friendly)
-    const prompt = `
+  if (!usage || usage.used_count >= usage.max_credits) {
+    return NextResponse.json(
+      { error: "No credits left. Please buy more." },
+      { status: 403 }
+    );
+  }
+
+  // 3️⃣ READ INPUT
+  const body = await req.json();
+  const {
+    situation,
+    role,
+    communication_mode,
+    person_behavior,
+  } = body;
+
+  // 4️⃣ PROMPT
+  const prompt = `
 You are Zero Conflict AI.
+Generate 3 scripts in Hinglish (Indian friendly tone):
 
-Generate 3 FIRST-PERSON conversation scripts (I / me / my).
-Do NOT speak in third person.
+1. Empathetic
+2. Bold
+3. Clever
 
-Tone must feel natural for Indians (Hinglish allowed).
+Situation: ${situation}
+Role: ${role}
+Communication mode: ${communication_mode}
+Person behavior: ${person_behavior}
 
-Context:
-- Situation: ${situation}
-- Role of other person: ${role}
-- Mode of communication: ${mode}
-- Behaviour of other person: ${behaviour}
-
-Return JSON strictly in this format:
-
+Return JSON only:
 {
   "scripts": [
-    { "type": "Empathetic", "text": "..." },
-    { "type": "Bold", "text": "..." },
-    { "type": "Clever", "text": "..." }
+    { "type": "Empathetic", "text": "" },
+    { "type": "Bold", "text": "" },
+    { "type": "Clever", "text": "" }
   ]
 }
 `;
 
-    // 3️⃣ OpenAI call (CORRECT METHOD)
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-      max_tokens: 600,
-    });
+  // 5️⃣ OPENAI CALL
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.7,
+  });
 
-    const rawText = completion.choices[0]?.message?.content || "{}";
-    const parsed = JSON.parse(rawText);
+  const result = completion.choices[0].message.content;
 
-    // 4️⃣ Save script history
-    await supabase.from("generated_scripts").insert({
-      user_id: userId,
-      request_id: crypto.randomUUID(),
-      payload: parsed,
-    });
+  // 6️⃣ SAVE SCRIPT
+  await supabase.from("generated_scripts").insert({
+    user_id: user.id,
+    content: result,
+  });
 
-    // 5️⃣ Deduct credit
-    await supabase
-      .from("usage_limits")
-      .update({ credits: usage.credits - 1 })
-      .eq("user_id", userId);
+  // 7️⃣ DEDUCT CREDIT
+  await supabase
+    .from("usage_limits")
+    .update({ used_count: usage.used_count + 1 })
+    .eq("user_id", user.id);
 
-    return NextResponse.json(parsed);
-  } catch (error: any) {
-    console.error("Generate API error:", error);
-    return NextResponse.json(
-      { error: "Failed to generate script" },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(JSON.parse(result));
 }

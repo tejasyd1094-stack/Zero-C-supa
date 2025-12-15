@@ -1,28 +1,41 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { createContext, useEffect, useState } from "react";
+import { User } from "@supabase/supabase-js";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
+export const AuthContext = createContext<{
+  user: User | null;
+  loading: boolean;
+}>({
+  user: null,
+  loading: true,
+});
+
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = supabaseBrowser();
-
-    // Load initial session
-    supabase.auth.getSession().then(({ data }) => {
+    // ✅ 1️⃣ LOAD INITIAL SESSION
+    supabaseBrowser.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
+      setLoading(false);
     });
 
-    // Listen for login/logout changes
+    // ✅ 2️⃣ LISTEN FOR CHANGES
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabaseBrowser.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  return <>{children}</>;
+  return (
+    <AuthContext.Provider value={{ user, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
