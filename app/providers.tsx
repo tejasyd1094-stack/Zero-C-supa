@@ -1,8 +1,12 @@
 "use client";
 
 import { createContext, useEffect, useState } from "react";
-import { supabaseBrowser } from "@/lib/supabaseBrowser";
-import { User } from "@supabase/supabase-js";
+import { createClient, User } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export const AuthContext = createContext<{
   user: User | null;
@@ -17,20 +21,22 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load initial session
-    supabaseBrowser.auth.getUser().then(({ data }) => {
+    // Load session on refresh / magic link redirect
+    supabase.auth.getUser().then(({ data }) => {
       setUser(data.user ?? null);
       setLoading(false);
     });
 
-    // Listen for auth changes (THIS IS CRITICAL)
-    const {
-      data: { subscription },
-    } = supabaseBrowser.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    // Listen to auth changes
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   return (
