@@ -1,76 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useContext } from "react";
+import { AuthContext } from "@/app/providers";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { useRouter } from "next/navigation";
 
 export default function Navbar() {
+  const { user, loading } = useContext(AuthContext);
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
 
-  useEffect(() => {
-    // Initial user fetch
-    supabaseBrowser.auth.getUser().then(({ data }) => {
-      setUser(data.user ?? null);
-    });
+  if (loading) return null;
 
-    // Listen to auth changes
-    const {
-      data: { subscription },
-    } = supabaseBrowser.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  async function handleLogout() {
+  async function logout() {
     await supabaseBrowser.auth.signOut();
-    router.push("/");
+    router.push("/login");
   }
 
   return (
-    <nav className="w-full border-b border-white/10 bg-[#0b1228]">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <img src="/logo.png" alt="Zero Conflict AI" className="h-8 w-8" />
-        </Link>
+    <nav className="flex justify-between px-6 py-4 border-b">
+      <Link href="/" className="font-bold">
+        Zero Conflict AI
+      </Link>
 
-        {/* Links */}
-        <div className="flex items-center gap-4 text-sm">
-          <Link href="/pricing" className="text-white/70 hover:text-white">
-            Pricing
-          </Link>
+      <div className="flex gap-4">
+        <Link href="/pricing">Pricing</Link>
 
-          {user && (
-            <Link
-              href="/dashboard"
-              className="text-white/70 hover:text-white"
-            >
-              Dashboard
-            </Link>
-          )}
-
-          {!user ? (
-            <Link
-              href="/login"
-              className="px-3 py-1.5 rounded-md bg-white text-black font-medium"
-            >
-              Login
-            </Link>
-          ) : (
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1.5 rounded-md bg-white text-black font-medium"
-            >
-              Logout
-            </button>
-          )}
-        </div>
+        {user ? (
+          <>
+            <Link href="/dashboard">Dashboard</Link>
+            <button onClick={logout}>Logout</button>
+          </>
+        ) : (
+          <Link href="/login">Login</Link>
+        )}
       </div>
     </nav>
   );
