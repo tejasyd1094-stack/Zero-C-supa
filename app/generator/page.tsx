@@ -10,6 +10,8 @@ type Script = {
 
 export default function GeneratorPage() {
   const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [scripts, setScripts] = useState<Script[]>([]);
@@ -19,16 +21,34 @@ export default function GeneratorPage() {
   const [communicationMode, setCommunicationMode] = useState("");
   const [personBehavior, setPersonBehavior] = useState("");
 
-  // 🔐 Load logged-in user
+  // ✅ Proper auth handling
   useEffect(() => {
-    supabaseBrowser.auth.getUser().then(({ data }) => {
-      setUser(data.user ?? null);
+    // 1️⃣ Load initial session
+    supabaseBrowser.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+      setAuthLoading(false);
     });
+
+    // 2️⃣ Listen to auth changes
+    const { data: listener } =
+      supabaseBrowser.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+        setAuthLoading(false);
+      });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const generateScript = async () => {
     setError("");
     setScripts([]);
+
+    if (authLoading) {
+      setError("Checking login status, please wait...");
+      return;
+    }
 
     if (!user) {
       setError("Please log in to generate the script.");
@@ -78,6 +98,10 @@ export default function GeneratorPage() {
       <p className="text-white/70 mb-8">
         Works for office, friends, partners & family — in Hinglish.
       </p>
+
+      {authLoading && (
+        <p className="text-white/60 mb-4">Checking login status…</p>
+      )}
 
       <div className="space-y-4">
         <textarea
@@ -129,7 +153,7 @@ export default function GeneratorPage() {
 
         <button
           onClick={generateScript}
-          disabled={loading}
+          disabled={loading || authLoading}
           className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded font-semibold"
         >
           {loading ? "Generating..." : "Generate Script"}
